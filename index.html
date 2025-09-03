@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Is It Pink?</title>
+  <meta name="description" content="Vote live: is the picture pink?" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* subtle glass & glow */
+    .glass { backdrop-filter: blur(10px); background: rgba(255,255,255,0.06); }
+    .glow { box-shadow: 0 0 40px 6px rgba(255, 105, 180, 0.25); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; border-radius: 1rem; padding: 0.75rem 1.25rem; font-weight: 600; transition: all 150ms cubic-bezier(0.4,0,0.2,1); }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background-color: #ec4899; color: #000; }
+    .btn-primary:hover { background-color: #f472b6; }
+    .btn-ghost { background-color: rgba(255,255,255,0.05); color: #fff; }
+    .btn-ghost:hover { background-color: rgba(255,255,255,0.10); }
+    .icon-btn { width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; border-radius: 0.75rem; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); }
+    .icon-btn:hover { background-color: rgba(255,255,255,0.10); }
+    .progress-bar { height: 12px; border-radius: 9999px; }
+    .hidden-until-vote.hidden { display: none; }
+    .nav-link { font-size: 0.875rem; line-height: 1.25rem; padding: 0.25rem 0.75rem; border-radius: 0.5rem; }
+    .nav-link:hover { background-color: rgba(255,255,255,0.10); }
+    .route-hidden { display: none; }
+      .hint { font-size: 0.75rem; line-height: 1rem; color: rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body class="min-h-screen bg-[#0b0d12] text-white selection:bg-pink-500 selection:text-black">
+  <!-- Top Bar -->
+  <header class="fixed inset-x-0 top-0 z-40">
+    <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg sm:text-xl font-bold tracking-wide">IS IT <span class="text-pink-400">PINK</span>?</h1>
+        <a href="#upload" id="uploadNav" class="nav-link">Upload</a>
+        <a href="#vote" id="voteNav" class="nav-link hidden">Vote</a>
+      </div>
+      <nav class="flex items-center gap-2 sm:gap-3">        
+        <!-- Pump.fun -->
+        <a id="pumpfunLink" href="#" target="_blank" rel="noopener" class="icon-btn" title="Pump.fun">
+          <img src="img/pumpfun.png" alt="Pump.fun" class="w-6 h-6 object-contain" />
+        </a>
+        <!-- Dexscreener -->
+        <a id="dexLink" href="#" target="_blank" rel="noopener" class="icon-btn" title="Dexscreener">
+          <img src="img/dex.png" alt="Dexscreener" class="w-6 h-6 object-contain" />
+        </a>
+        <!-- Twitter/X -->
+        <a id="xProfileLink" href="#" target="_blank" rel="noopener" class="icon-btn" title="Twitter/X">
+          <svg viewBox="0 0 24 24" class="w-6 h-6" fill="currentColor" aria-hidden="true"><path d="M17.53 3H20l-6.9 7.9L21 21h-5.23l-4.08-4.82L6.9 21H4.44l7.4-8.46L3 3h5.32l3.7 4.35L17.53 3Zm-1.83 16h1.37L8.4 5H7.05l8.65 14Z"/></svg>
+        </a>
+        <!-- Copy CA -->
+        <button id="copyBtn" class="icon-btn" title="Copy Contract Address">
+          <svg viewBox="0 0 24 24" class="w-6 h-6" fill="currentColor" aria-hidden="true"><path d="M16 1H4a2 2 0 0 0-2 2v12h2V3h12V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z"/></svg>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- VOTE ROUTE -->
+  <main id="route-vote" class="route mt-20 route-hidden">
+    <div class="mx-auto max-w-3xl px-4 pb-28">
+      <section class="glass glow rounded-3xl p-4 sm:p-6">
+        <!-- Image/Card -->
+        <div class="relative rounded-2xl overflow-hidden border border-white/10 bg-black/30 aspect-[4/3] flex items-center justify-center">
+          <img id="pic" alt="Picture to vote on" src="" class="w-full h-full object-cover"/>
+          <div id="loadingOverlay" class="absolute inset-0 grid place-items-center bg-black/30">
+            <div class="animate-pulse text-white/60">Loading…</div>
+          </div>
+          <!-- Image name caption -->
+          <div class="absolute left-3 bottom-3 glass rounded-xl px-3 py-1 text-xs sm:text-sm">
+            <span id="imgName">Untitled</span>
+          </div>
+        </div>
+
+        <!-- Question / Actions -->
+        <div class="mt-6 flex items-center justify-between gap-2">
+          <p class="text-lg sm:text-xl font-semibold">Is it <span class="text-pink-400">pink</span>?</p>
+          <div class="text-sm text-white/60">Total votes: <span id="totalVotes">0</span></div>
+        </div>
+
+        <div id="voteRow" class="mt-4 grid grid-cols-2 gap-3">
+          <button id="btnPink" class="btn btn-primary text-base sm:text-lg">PINK</button>
+          <button id="btnNot" class="btn btn-ghost text-base sm:text-lg">NOT</button>
+        </div>
+
+        <!-- Results (hidden until vote) -->
+        <div id="results" class="hidden-until-vote hidden mt-6 space-y-4">
+          <div>
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span>Pink</span>
+              <span id="pinkPct">0%</span>
+            </div>
+            <div class="w-full bg-white/10 progress-bar">
+              <div id="pinkBar" class="bg-pink-500 progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span>Not</span>
+              <span id="notPct">0%</span>
+            </div>
+            <div class="w-full bg-white/10 progress-bar">
+              <div id="notBar" class="bg-white/70 progress-bar" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 pt-2">
+            <button id="nextBtn" class="btn btn-ghost">Next</button>
+            <button id="shareBtn" class="btn btn-ghost">Share to X</button>
+            <span id="duplicateWarn" class="text-xs text-yellow-400 hidden">You already voted on this image.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- UPLOAD ROUTE -->
+  <main id="route-upload" class="route mt-20 route-hidden">
+    <div class="mx-auto max-w-xl px-4 pb-20">
+      <section class="glass rounded-3xl p-6">
+        <h2 class="text-xl font-bold mb-4">Upload Image</h2>
+        <p class="text-sm text-white/60 mb-4">Pick a file, give it a display name, and upload. It will appear in the global pool for voting.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm mb-1">Display name</label>
+            <input id="uplName" type="text" placeholder="e.g., Neon Hoodie" class="w-full bg-white/5 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-500"/>
+          </div>
+          <div>
+            <label class="block text-sm mb-1">Image file</label>
+            <input id="uplFile" type="file" accept="image/*" class="w-full text-sm"/>
+          </div>
+          <div class="flex items-center gap-3 pt-2">
+            <button id="uplBtn" class="btn btn-primary">Upload</button>
+            <span id="uplMsg" class="text-sm text-white/70"></span>
+          </div>
+        </div>
+
+        <hr class="my-6 border-white/10"/>
+        <h3 class="text-lg font-semibold mb-2">Recent uploads</h3>
+        <ul id="recentList" class="space-y-2 text-sm"></ul>
+      </section>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-4 right-4 text-sm bg-white text-black rounded-xl px-4 py-2 shadow-xl hidden">Copied!</div>
+
+  <!-- Firebase + App Logic -->
+  <script type="module">
+    // ======== CONFIG (replace these) ========
+    const CONTRACT = "So11111111111111111111111111111111111111112"; // your CA
+    const LINKS = {
+      pumpfun: "https://pump.fun/",
+      dexscreener: "https://dexscreener.com/solana/",
+      xProfile: "https://x.com/i/communities/1963277893058117816"
+    };
+
+    // If Firestore `images` collection is empty, we'll use these fallbacks.
+    const FALLBACK_IMAGES = [
+      { url: "https://placehold.co/1200x900/ff69b4/111?text=Definitely+Pink", name: "Definitely Pink" },
+      { url: "https://placehold.co/1200x900/2dd4bf/111?text=Minty", name: "Minty" },
+      { url: "https://placehold.co/1200x900/f472b6/111?text=Pinkish", name: "Pinkish" },
+      { url: "https://placehold.co/1200x900/22d3ee/111?text=Blueish", name: "Blueish" },
+      { url: "https://placehold.co/1200x900/f9a8d4/111?text=Soft+Pink", name: "Soft Pink" },
+    ];
+
+    // ======== Firebase Setup (fill with your project's config) ========
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction, serverTimestamp, collection, getDocs, query, limit, increment, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
+
+    const firebaseConfig = {
+    apiKey: "AIzaSyCM_vl4yFl4ybIkrLeqRZ3AvVYtWs44rM4",
+    authDomain: "isitpink-1c7d3.firebaseapp.com",
+    projectId: "isitpink-1c7d3",
+    storageBucket: "isitpink-1c7d3.firebasestorage.app",
+    messagingSenderId: "132728864256",
+    appId: "1:132728864256:web:48e461a19391deae8462e5",
+    measurementId: "G-HSTSGFQS85"
+  };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // ======== Routing ========
+    const routes = {
+      vote: document.getElementById('route-vote'),
+      upload: document.getElementById('route-upload'),
+    };
+    const uploadNav = document.getElementById('uploadNav');
+    const voteNav = document.getElementById('voteNav');
+
+    function renderRoute(){
+      const hash = (location.hash || '#vote').replace('#','');
+      for (const k of Object.keys(routes)){
+        routes[k].classList.toggle('route-hidden', k !== hash);
+      }
+      uploadNav.classList.toggle('hidden', hash === 'upload');
+      voteNav.classList.toggle('hidden', hash !== 'upload');
+      voteNav.href = '#vote';
+    }
+    window.addEventListener('hashchange', renderRoute);
+    // Render initial route immediately so the main vote page shows on load
+    renderRoute();
+
+    // ======== DOM (Vote) ========
+    const pic = document.getElementById('pic');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const totalVotesEl = document.getElementById('totalVotes');
+    const imgNameEl = document.getElementById('imgName');
+
+    const btnPink = document.getElementById('btnPink');
+    const btnNot = document.getElementById('btnNot');
+    const resultsWrap = document.getElementById('results');
+    const pinkPct = document.getElementById('pinkPct');
+    const notPct = document.getElementById('notPct');
+    const pinkBar = document.getElementById('pinkBar');
+    const notBar = document.getElementById('notBar');
+    const nextBtn = document.getElementById('nextBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const duplicateWarn = document.getElementById('duplicateWarn');
+
+    const pumpfunLink = document.getElementById('pumpfunLink');
+    const dexLink = document.getElementById('dexLink');
+    const xProfileLink = document.getElementById('xProfileLink');
+    const copyBtn = document.getElementById('copyBtn');
+    const toast = document.getElementById('toast');
+
+    pumpfunLink.href = LINKS.pumpfun;
+    dexLink.href = LINKS.dexscreener;
+    xProfileLink.href = LINKS.xProfile;
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(CONTRACT);
+        showToast('Contract copied');
+      } catch (e) { showToast('Copy failed'); }
+    });
+
+    function showToast(txt){
+      toast.textContent = txt;
+      toast.classList.remove('hidden');
+      setTimeout(()=> toast.classList.add('hidden'), 1300);
+    }
+
+    // ======== Poll State ========
+    const POLL_ID = 'global';
+    const pollRef = doc(db, 'polls', POLL_ID);
+
+    let uid = null;
+    let userChoice = null; // 'pink' | 'not'
+    let resolveAuthReady;
+    const authReady = new Promise((res) => { resolveAuthReady = res; });
+
+    // auth first
+    signInAnonymously(auth).catch(console.error);
+    onAuthStateChanged(auth, async (u) => {
+      if (!u) return;
+      uid = u.uid;
+      if (resolveAuthReady) { resolveAuthReady(); resolveAuthReady = null; }
+      init();
+    });
+
+    async function init(){
+      renderRoute();
+      // Ensure poll doc exists
+      const snap = await getDoc(pollRef);
+      if (!snap.exists()) {
+        const firstImage = await pickInitialImage();
+        await setDoc(pollRef, { imageUrl: firstImage.url, imageId: firstImage.id, imageName: firstImage.name || 'Untitled', pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+      }
+      // live subscribe
+      onSnapshot(pollRef, async (docSnap)=>{
+        if (!docSnap.exists()) return;
+        const data = docSnap.data();
+        renderImage(data.imageUrl);
+        await renderImageName(data);
+        renderTallies(data.pink||0, data.notPink||0);
+        // reset UI for fresh image
+        userChoice = null;
+        duplicateWarn.classList.add('hidden');
+        resultsWrap.classList.add('hidden');
+        btnPink.disabled = false; btnNot.disabled = false;
+        btnPink.classList.remove('opacity-50');
+        btnNot.classList.remove('opacity-50');
+      });
+
+      // wire actions
+      btnPink.addEventListener('click', ()=> handleVote('pink'));
+      btnNot.addEventListener('click', ()=> handleVote('not'));
+      nextBtn.addEventListener('click', nextImage);
+      shareBtn.addEventListener('click', shareToX);
+
+      // load recent uploads list initially (and when navigating to #upload)
+      loadRecentUploads();
+      window.addEventListener('hashchange', () => {
+        if ((location.hash||'').includes('upload')) loadRecentUploads();
+      });
+    }
+
+    function renderImage(url){
+      loadingOverlay.classList.remove('hidden');
+      pic.onload = () => loadingOverlay.classList.add('hidden');
+      pic.onerror = () => { loadingOverlay.classList.add('hidden'); pic.alt = 'Failed to load image'; };
+      pic.src = url;
+    }
+
+    async function renderImageName(data){
+      let name = data.imageName;
+      if (!name && data.imageId){
+        try {
+          const s = await getDoc(doc(db,'images', data.imageId));
+          if (s.exists()) name = s.data().name || 'Untitled';
+          if (name) await updateDoc(pollRef, { imageName: name }); // backfill for future
+        } catch(e){ /* ignore */ }
+      }
+      imgNameEl.textContent = name || 'Untitled';
+    }
+
+    function renderTallies(pink, notPink){
+      const total = (pink|0) + (notPink|0);
+      totalVotesEl.textContent = total;
+      const pPink = total ? Math.round(pink * 100 / total) : 0;
+      const pNot = total ? Math.round(notPink * 100 / total) : 0;
+      pinkPct.textContent = pPink + '%';
+      notPct.textContent  = pNot + '%';
+      pinkBar.style.width = pPink + '%';
+      notBar.style.width  = pNot + '%';
+    }
+
+    async function handleVote(choice){
+      if (!uid) {
+        try { await authReady; } catch(e) {}
+        if (!uid) { showToast('Please try again'); return; }
+      }
+      try {
+        await runTransaction(db, async (t) => {
+          const pollSnap = await t.get(pollRef);
+          if (!pollSnap.exists()) throw new Error('missing-poll');
+          const data = pollSnap.data();
+          const voteDoc = doc(db, `polls/${POLL_ID}/votes/${uid}`);
+          const voteSnap = await t.get(voteDoc);
+          const alreadyForThis = voteSnap.exists() && voteSnap.data().lastVotedImageId === data.imageId;
+          if (alreadyForThis) { throw new Error('already-voted'); }
+          const field = (choice === 'pink') ? 'pink' : 'notPink';
+          t.update(pollRef, { [field]: increment(1) });
+          t.set(voteDoc, { lastVotedImageId: data.imageId, lastChoice: choice, at: serverTimestamp() }, { merge: true });
+        });
+        userChoice = choice;
+        resultsWrap.classList.remove('hidden');
+        btnPink.disabled = true; btnNot.disabled = true;
+        btnPink.classList.add('opacity-50');
+        btnNot.classList.add('opacity-50');
+      } catch (e){
+        if (String(e).includes('already-voted')){
+          duplicateWarn.classList.remove('hidden');
+          resultsWrap.classList.remove('hidden');
+        } else {
+          console.error(e);
+          showToast('Vote failed');
+        }
+      }
+    }
+
+    async function pickInitialImage(){
+      try {
+        const qSnap = await getDocs(query(collection(db,'images'), orderBy('createdAt','desc'), limit(50)));
+        if (!qSnap.empty){
+          const docs = qSnap.docs.map(d => ({ id: d.id, url: d.data().url, name: d.data().name || 'Untitled' }));
+          return docs[Math.floor(Math.random()*docs.length)];
+        }
+      } catch(e) { /* ignore, fall back */ }
+      // fallback
+      const idx = Math.floor(Math.random()*FALLBACK_IMAGES.length);
+      const fb = FALLBACK_IMAGES[idx];
+      return { id: 'fallback-'+idx, url: fb.url, name: fb.name };
+    }
+
+    async function nextImage(){
+      try {
+        const next = await pickInitialImage();
+        await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name || 'Untitled', pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+      } catch (e){
+        console.error(e);
+        showToast('Next failed');
+      }
+    }
+
+    function shareToX(){
+      const url = window.location.origin + window.location.pathname;
+      const name = imgNameEl.textContent || '';
+      const txt = userChoice ? `I voted ${userChoice.toUpperCase()} on #IsItPink — ${name}` : `Vote on #IsItPink — ${name}`;
+      const intent = new URL('https://twitter.com/intent/tweet');
+      intent.searchParams.set('text', txt);
+      intent.searchParams.set('url', url);
+      window.open(intent.toString(), '_blank', 'noopener');
+    }
+
+    // ======== Uploader ========
+    const uplName = document.getElementById('uplName');
+    const uplFile = document.getElementById('uplFile');
+    const uplBtn = document.getElementById('uplBtn');
+    const uplMsg = document.getElementById('uplMsg');
+    const recentList = document.getElementById('recentList');
+
+    uplBtn.addEventListener('click', uploadImage);
+
+    async function compressImage(file, maxW=1600, maxH=1600, quality=0.85){
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      await img.decode();
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const scale = Math.min(1, maxW / w, maxH / h);
+      const cw = Math.round(w * scale), ch = Math.round(h * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, cw, ch);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+      return blob || file;
+    }
+
+    async function uploadImage(){
+      uplMsg.textContent = '';
+      // Ensure auth is ready so Firestore/Storage writes succeed on first try
+      if (!uid) {
+        try { await authReady; } catch(e) {}
+        if (!uid) { uplMsg.textContent = 'Please try again'; return; }
+      }
+      const file = uplFile.files && uplFile.files[0];
+      const name = (uplName.value || '').trim();
+      if (!file) { uplMsg.textContent = 'Pick a file.'; return; }
+      if (!name) { uplMsg.textContent = 'Enter a display name.'; return; }
+      // quick local rate limit (30s)
+      const now = Date.now();
+      const last = +(localStorage.getItem('lastUploadAt')||0);
+      if (now - last < 30000) { uplMsg.textContent = 'Slow down a bit (30s between uploads).'; return; }
+      if (!file.type.startsWith('image/')) { uplMsg.textContent = 'Images only.'; return; }
+
+      try {
+        uplBtn.disabled = true;
+        uplBtn.textContent = 'Uploading…';
+
+        const MAX_MB = 5; // keep under server rule
+        let blob = file;
+        if (file.size > 2*1024*1024) {
+          try { blob = await compressImage(file, 1600, 1600, 0.85); } catch(e) {}
+        }
+        if (blob.size > MAX_MB*1024*1024) { uplMsg.textContent = 'Image too large (>5MB after compression).'; return; }
+
+        const safe = name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+        const path = `images/${Date.now()}-${safe || 'img'}.jpg`;
+        const ref = sRef(storage, path);
+        await uploadBytes(ref, blob, { contentType: 'image/jpeg' });
+        const url = await getDownloadURL(ref);
+        await addDoc(collection(db,'images'), { name, url, storagePath: path, createdAt: serverTimestamp() });
+
+        localStorage.setItem('lastUploadAt', String(Date.now()));
+        uplMsg.textContent = 'Uploaded!';
+        uplFile.value = '';
+        uplName.value = '';
+        loadRecentUploads();
+      } catch(e){
+        console.error(e);
+        uplMsg.textContent = 'Upload failed';
+      } finally {
+        uplBtn.disabled = false;
+        uplBtn.textContent = 'Upload';
+      }
+    }
+
+    async function loadRecentUploads(){
+      recentList.innerHTML = '';
+      try {
+        const qSnap = await getDocs(query(collection(db,'images'), orderBy('createdAt','desc'), limit(10)));
+        const frags = [];
+        qSnap.forEach(d => {
+          const data = d.data();
+          const li = document.createElement('li');
+          li.className = 'flex items-center gap-3';
+          li.innerHTML = `
+            <img src="${data.url}" alt="${data.name||''}" class="w-12 h-12 object-cover rounded-lg border border-white/10"/>
+            <div class="flex-1">
+              <div class="font-semibold">${(data.name||'Untitled')}</div>
+              <div class="text-white/60 text-xs break-all">${data.url}</div>
+            </div>
+            <button class="btn btn-ghost text-xs" data-url="${data.url}" data-id="${d.id}">Use Now</button>
+          `;
+          li.querySelector('button').addEventListener('click', async (ev)=>{
+            const next = { id: d.id, url: data.url, name: data.name || 'Untitled' };
+            try {
+              await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name, pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+              location.hash = '#vote';
+            } catch(e){ console.error(e); showToast('Failed to set image'); }
+          });
+          frags.push(li);
+        });
+        frags.forEach(el => recentList.appendChild(el));
+      } catch(e){ console.error(e); }
+    }
+  </script>
+
+  <!-- Optional: Firestore & Storage security rules (copy into Firebase console) ***
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /polls/{pollId} {
+        allow read: if true;
+        allow write: if request.auth != null; // tighten for prod
+        match /votes/{uid} {
+          allow read, write: if request.auth != null && request.auth.uid == uid;
+        }
+      }
+      match /images/{imageId} {
+        allow read: if true;
+        allow write: if request.auth != null; // anyone logged in anonymously can add images
+      }
+    }
+  }
+
+  // Storage Rules (Storage → Rules)
+  rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+      match /images/{allPaths=**} {
+        allow read: if true; // public read OK for demo
+        allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*'); // anyone (anon) can upload small images
+      }
+    }
+  }
+  *** End rules -->
+</body>
+</html>
