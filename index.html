@@ -256,6 +256,7 @@
     let userChoice = null; // 'pink' | 'not'
     let resolveAuthReady;
     const authReady = new Promise((res) => { resolveAuthReady = res; });
+    let unsubscribeImage = null; // live subscription to current image tallies
 
     // auth first (ensure persistence, then sign in)
     setPersistence(auth, browserLocalPersistence)
@@ -275,7 +276,7 @@
       const snap = await getDoc(pollRef);
       if (!snap.exists()) {
         const firstImage = await pickInitialImage();
-        await setDoc(pollRef, { imageUrl: firstImage.url, imageId: firstImage.id, imageName: firstImage.name || 'Untitled', pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+        await setDoc(pollRef, { imageUrl: firstImage.url, imageId: firstImage.id, imageName: firstImage.name || 'Untitled', lastUpdated: serverTimestamp() });
       }
       // live subscribe
       onSnapshot(pollRef, async (docSnap)=>{
@@ -283,7 +284,17 @@
         const data = docSnap.data();
         renderImage(data.imageUrl);
         await renderImageName(data);
-        renderTallies(data.pink||0, data.notPink||0);
+        // Subscribe to image tallies and render
+        if (unsubscribeImage) { try { unsubscribeImage(); } catch(e){} unsubscribeImage = null; }
+        if (data.imageId && !String(data.imageId).startsWith('fallback-')){
+          const imgRef = doc(db,'images', data.imageId);
+          unsubscribeImage = onSnapshot(imgRef, (imgSnap) => {
+            const imgData = imgSnap.data() || {};
+            renderTallies(imgData.pink||0, imgData.notPink||0);
+          });
+        } else {
+          renderTallies(0,0);
+        }
         // reset UI for fresh image
         userChoice = null;
         duplicateWarn.classList.add('hidden');
@@ -346,13 +357,14 @@
           const pollSnap = await t.get(pollRef);
           if (!pollSnap.exists()) throw new Error('missing-poll');
           const data = pollSnap.data();
-          const voteDoc = doc(db, `polls/${POLL_ID}/votes/${uid}`);
+          if (!data.imageId || String(data.imageId).startsWith('fallback-')) throw new Error('no-image-for-vote');
+          const imageRef = doc(db,'images', data.imageId);
+          const voteDoc = doc(db, `images/${data.imageId}/votes/${uid}`);
           const voteSnap = await t.get(voteDoc);
-          const alreadyForThis = voteSnap.exists() && voteSnap.data().lastVotedImageId === data.imageId;
-          if (alreadyForThis) { throw new Error('already-voted'); }
+          if (voteSnap.exists()) { throw new Error('already-voted'); }
           const field = (choice === 'pink') ? 'pink' : 'notPink';
-          t.update(pollRef, { [field]: increment(1) });
-          t.set(voteDoc, { lastVotedImageId: data.imageId, lastChoice: choice, at: serverTimestamp() }, { merge: true });
+          t.update(imageRef, { [field]: increment(1) });
+          t.set(voteDoc, { choice, at: serverTimestamp() }, { merge: true });
         });
         userChoice = choice;
         resultsWrap.classList.remove('hidden');
@@ -363,6 +375,8 @@
         if (String(e).includes('already-voted')){
           duplicateWarn.classList.remove('hidden');
           resultsWrap.classList.remove('hidden');
+        } else if (String(e).includes('no-image-for-vote')){
+          showToast('Set an uploaded image first');
         } else {
           console.error(e);
           showToast('Vote failed');
@@ -387,7 +401,7 @@
     async function nextImage(){
       try {
         const next = await pickInitialImage();
-        await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name || 'Untitled', pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+        await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name || 'Untitled', lastUpdated: serverTimestamp() });
       } catch (e){
         console.error(e);
         showToast('Next failed');
@@ -461,7 +475,7 @@
         const ref = sRef(storage, path);
         await uploadBytes(ref, blob, { contentType: 'image/jpeg' });
         const url = await getDownloadURL(ref);
-        await addDoc(collection(db,'images'), { name, url, storagePath: path, createdAt: serverTimestamp() });
+        await addDoc(collection(db,'images'), { name, url, storagePath: path, pink: 0, notPink: 0, createdAt: serverTimestamp() });
 
         localStorage.setItem('lastUploadAt', String(Date.now()));
         uplMsg.textContent = 'Uploaded!';
@@ -496,7 +510,7 @@
           li.querySelector('button').addEventListener('click', async (ev)=>{
             const next = { id: d.id, url: data.url, name: data.name || 'Untitled' };
             try {
-              await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name, pink: 0, notPink: 0, lastUpdated: serverTimestamp() });
+              await setDoc(pollRef, { imageUrl: next.url, imageId: next.id, imageName: next.name, lastUpdated: serverTimestamp() });
               location.hash = '#vote';
             } catch(e){ console.error(e); showToast('Failed to set image'); }
           });
