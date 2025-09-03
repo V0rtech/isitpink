@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Is It Pink?</title>
   <meta name="description" content="Vote live: is the picture pink?" />
+  <link rel="icon" href="img/favicon.ico" type="image/x-icon" />
+  <link rel="shortcut icon" href="img/favicon.ico" type="image/x-icon" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     /* subtle glass & glow */
@@ -166,7 +168,7 @@
 
     // ======== Firebase Setup (fill with your project's config) ========
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, runTransaction, serverTimestamp, collection, getDocs, query, limit, increment, orderBy, addDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
@@ -255,11 +257,14 @@
     let resolveAuthReady;
     const authReady = new Promise((res) => { resolveAuthReady = res; });
 
-    // auth first
-    signInAnonymously(auth).catch(console.error);
+    // auth first (ensure persistence, then sign in)
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => signInAnonymously(auth))
+      .catch((e) => { console.error('Auth init failed:', e); });
     onAuthStateChanged(auth, async (u) => {
-      if (!u) return;
+      if (!u) { console.warn('Auth state: no user'); return; }
       uid = u.uid;
+      console.log('uid', uid);
       if (resolveAuthReady) { resolveAuthReady(); resolveAuthReady = null; }
       init();
     });
