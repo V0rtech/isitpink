@@ -505,7 +505,7 @@
             <div class="flex-1">
               <div class="font-semibold">${(data.name||'Untitled')}</div>
             </div>
-            <button class="btn btn-ghost text-xs" data-url="${data.url}" data-id="${d.id}">Use Now</button>
+            <button class="btn btn-ghost text-xs" data-url="${data.url}" data-id="${d.id}">Vote Now</button>
           `;
           li.querySelector('button').addEventListener('click', async (ev)=>{
             const next = { id: d.id, url: data.url, name: data.name || 'Untitled' };
